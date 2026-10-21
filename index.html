@@ -166,6 +166,13 @@ label.ck input{margin-top:3px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chips a{font-size:12px;font-weight:700;border:1px solid var(--line);padding:5px 12px;border-radius:99px;background:var(--surface)}
 .chips a:hover{background:var(--hover)}
+.vbadge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:var(--bg);border:1px solid var(--line);color:var(--muted,#667)}
+.vbadge.ok{background:#e3f4ea;color:#14663a;border-color:#b7e0c6}
+.vsteps{display:grid;gap:10px}
+.vstep{display:grid;gap:8px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.vstep h4{margin:0;font-size:14px}
+.vstep .acts{display:flex;flex-wrap:wrap;gap:8px}
+.vbar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}.vbar i{display:block;height:100%;background:var(--accent,#e6a419);width:0;transition:width .2s}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px}
 .pcard{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow);min-width:0}
 .pcard .lbody{gap:12px}
@@ -545,6 +552,50 @@ function viewFind(){
   return h+'</section>';
 }
 
+
+/* ---------- land verification ---------- */
+var VSTEPS=[
+ ['pin','Pin the exact location','Open Google Maps, drop a pin on the land, click it and copy the coordinates (example 17.916482, 78.813686).'],
+ ['survey','Find the survey number on Bhuvan 2D','Open Bhuvan 2D (ISRO), paste the coordinates in the search box and read the survey number the map shows.'],
+ ['owner','Look up the owner on the state land portal','Pick district, mandal and village, search by survey number and note the pattadar name, khata, extent and land nature.'],
+ ['match','Match the owner to the seller','The pattadar name should match the person selling, or their documented power of attorney.'],
+ ['ec','Check the Encumbrance Certificate','Get the EC for this survey number from the registration department to see loans, disputes and earlier sales.'],
+ ['site','Visit the site and confirm boundaries','Walk the land with the seller and check boundaries and access against the survey sketch.']
+];
+var VSTATES={
+ 'Andhra Pradesh':{portal:['Meebhoomi (Adangal / 1-B)','https://meebhoomi.ap.gov.in/'],ec:['AP Registration &amp; Stamps (EC)','https://registration.ap.gov.in/']},
+ 'Telangana':{portal:['Bhu Bharati (Land details)','https://bhubharati.telangana.gov.in/'],ec:['Telangana Registration (EC)','https://registration.telangana.gov.in/']}
+};
+function vOf(p){if(!p.vf)p.vf={state:'Andhra Pradesh',steps:{}};if(!p.vf.steps)p.vf.steps={};return p.vf;}
+function vDone(p){var v=p.vf;if(!v||!v.steps)return 0;return VSTEPS.filter(function(x){return v.steps[x[0]];}).length;}
+function vMaps(v){var c=(v.coords||'').replace(/\s+/g,'');return /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(c)?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c):'https://www.google.com/maps';}
+function openVerify(id){
+  var p=S.props.find(function(x){return x.id===id;});if(!p)return;cur={kind:'verify',id:id};var v=vOf(p),st=VSTATES[v.state]||VSTATES['Andhra Pradesh'];
+  function inp(k,l,ph){return '<label>'+l+'<input data-vf="'+k+'" value="'+esc(v[k]||'')+'" placeholder="'+(ph||'')+'"></label>';}
+  var steps=VSTEPS.map(function(x,i){
+    var links='';
+    if(x[0]==='pin')links='<a class="btn sm" data-vlink="maps" href="'+vMaps(v)+'" target="_blank" rel="noreferrer">Open Google Maps '+IC.out+'</a>';
+    if(x[0]==='survey')links='<a class="btn sm" href="https://bhuvan.nrsc.gov.in/" target="_blank" rel="noreferrer">Open Bhuvan 2D '+IC.out+'</a>';
+    if(x[0]==='owner')links='<a class="btn sm" data-vlink="portal" href="'+st.portal[1]+'" target="_blank" rel="noreferrer">'+st.portal[0]+' '+IC.out+'</a>';
+    if(x[0]==='ec')links='<a class="btn sm" data-vlink="ec" href="'+st.ec[1]+'" target="_blank" rel="noreferrer">'+st.ec[0]+' '+IC.out+'</a>';
+    return '<div class="vstep"><label class="ck"><input type="checkbox" data-vs="'+x[0]+'" '+(v.steps[x[0]]?'checked':'')+'><h4>'+(i+1)+'. '+x[1]+'</h4></label><small>'+x[2]+'</small>'+(links?'<div class="acts">'+links+'</div>':'')+'</div>';}).join('');
+  layer.innerHTML='<div class="ov right"><section class="drw" role="dialog" aria-modal="true" aria-label="Verify land"><button class="x" data-act="close" aria-label="Close">'+IC.x+'</button><div class="eyebrow">Land verification</div><h2>'+esc(p.title)+'</h2><small>'+esc(p.city)+' · '+esc(p.type)+'</small>'+
+   '<div class="vbar"><i id="vbar"></i></div><small id="vprog"></small>'+
+   '<label>State of the land<select data-vf="state">'+Object.keys(VSTATES).map(function(k){return '<option'+(k===v.state?' selected':'')+'>'+k+'</option>';}).join('')+'</select></label>'+
+   '<div class="vsteps">'+steps+'</div>'+
+   '<div class="sec"><h3>Details to record</h3>'+
+   inp('coords','Coordinates from Google Maps','17.916482, 78.813686')+
+   '<div class="two">'+inp('survey','Survey number','e.g. 91 or 91/e/2')+inp('village','Village')+'</div>'+
+   '<div class="two">'+inp('mandal','Mandal')+inp('district','District')+'</div>'+
+   '<div class="two">'+inp('owner','Pattadar / owner name')+inp('father','Father’s / husband’s name')+'</div>'+
+   '<div class="two">'+inp('khata','Khata number')+inp('extent','Extent of land','e.g. 2.00 acres')+'</div>'+
+   '<div class="two">'+inp('nature','Nature of land')+inp('classification','Classification')+'</div>'+
+   '<label>Encumbrance / other notes<textarea rows="3" data-vf="notes" placeholder="EC result, disputes, loans, boundary remarks">'+esc(v.notes||'')+'</textarea></label>'+
+   '<small>Check every value on the official portal yourself. Entries here are your own notes, not government records.</small></div></section></div>';
+  vProg(p);
+}
+function vProg(p){var n=vDone(p),b=document.getElementById('vbar'),t=document.getElementById('vprog');if(b)b.style.width=Math.round(n/VSTEPS.length*100)+'%';if(t)t.textContent=n===VSTEPS.length?'All checks done. Land verified.':n+' of '+VSTEPS.length+' checks done.';var bd=document.getElementById('vb-'+p.id);if(bd){bd.textContent=n+'/'+VSTEPS.length+' checks';bd.classList.toggle('ok',n===VSTEPS.length);}}
+
 function viewProps(){
   if(!S.props.length)return '<section class="panel empty">'+emptyArt()+'<h3>Add the property you want to sell</h3><p>Record its city, type and asking price to see matches with reviewed buyer requirements. Properties you confirm from Find properties land here.</p><button class="btn pri" data-act="modal" data-v="property">'+IC.plus+'Add your first property</button></section>';
   return '<div class="pgrid">'+S.props.map(function(p){
@@ -555,6 +606,7 @@ function viewProps(){
      '<div style="display:grid;gap:3px;font-size:13px">'+(p.advertiser?'<span>Advertiser: '+esc(p.advertiser)+' · '+esc(p.role||'Unknown role')+'</span>':'')+(p.contact?'<span>Contact: '+esc(p.contact)+'</span>':'')+(p.notes?'<span class="muted">'+esc(p.notes)+'</span>':'')+'</div>'+
      '<div class="chips">'+imgLinks(p,3)+(src?'<a href="'+esc(src)+'" target="_blank" rel="noreferrer">Original listing '+IC.out+'</a>':'')+'</div><hr>'+
      '<h3>'+m.length+' requirement match'+(m.length===1?'':'es')+'</h3><small>Needs a confirmed city, type and sufficient budget. A match is not a commitment.</small><div>'+m.map(function(l){return '<button class="match" data-act="openLead" data-id="'+l.id+'">'+esc(l.username)+' '+IC.out+'</button>';}).join('')+'</div>'+
+     '<div class="acts"><button class="btn sm pri" data-act="openVerify" data-id="'+p.id+'">Verify land</button><span class="vbadge'+(vDone(p)===VSTEPS.length?' ok':'')+'" id="vb-'+p.id+'">'+vDone(p)+'/'+VSTEPS.length+' checks</span></div>'+
      '<button class="link" style="text-align:left;color:var(--rose)" data-act="delProp" data-id="'+p.id+'">Remove listing</button></div></section>';}).join('')+'</div>';
 }
 
@@ -722,6 +774,7 @@ document.addEventListener('click',function(ev){
   else if(act==='ch'){cur.ch=v;Array.prototype.forEach.call(document.querySelectorAll('#chs button'),function(b){b.classList.toggle('on',b.dataset.v===v);});setDraft();}
   else if(act==='logc'){var ll=curLead();if(ll){ll.contacts=(ll.contacts||[]).concat([{ch:cur.ch,at:new Date().toISOString()}]);if(ll.status==='New')ll.status='Contacted';save('leads',ll);var st=document.querySelector('[data-lf="status"]');if(st)st.value=ll.status;refreshOut();}}
   else if(act==='openListing')openListing(id);
+  else if(act==='openVerify')openVerify(id);
   else if(act==='sample'){document.getElementById('m-raw').value=cur.kind==='comments'?SAMPLE_C:SAMPLE_L;}
   else if(act==='doImport')doImport();
   else if(act==='exportLeads')dlFile('property-enquiries.csv',toCSV(filteredLeads(),LEAD_FIELDS));
@@ -750,6 +803,9 @@ document.addEventListener('input',function(ev){
   var t=ev.target;
   if(t.dataset.f){var k=t.dataset.f;S.f[k]=t.type==='checkbox'?t.checked:t.value;renderPage();return;}
   if(t.dataset.lf&&cur&&cur.kind==='lead'){var l=S.leads.find(function(x){return x.id===cur.id;});if(l){l[t.dataset.lf]=t.value;save('leads',l);var d=document.getElementById('draft');if(d&&!d.dataset.touched&&['location','type','country'].indexOf(t.dataset.lf)>=0){var sel=document.getElementById('mprop');d.value=tpl(cur.ch,l,sel&&sel.value?S.props.find(function(x){return x.id===sel.value;}):null);}refreshOut();}return;}
+  if((t.dataset.vf||t.dataset.vs)&&cur&&cur.kind==='verify'){var vp=S.props.find(function(x){return x.id===cur.id;});if(vp){var vv=vOf(vp);if(t.dataset.vs){vv.steps[t.dataset.vs]=t.checked;}else{vv[t.dataset.vf]=t.value;}save('props',vp);vProg(vp);
+      if(t.dataset.vf==='coords'){var a=document.querySelector('[data-vlink="maps"]');if(a)a.href=vMaps(vv);}
+      if(t.dataset.vf==='state'){var q=VSTATES[vv.state]||VSTATES['Andhra Pradesh'];var a1=document.querySelector('[data-vlink="portal"]'),a2=document.querySelector('[data-vlink="ec"]');if(a1){a1.href=q.portal[1];a1.innerHTML=q.portal[0]+' '+IC.out;}if(a2){a2.href=q.ec[1];a2.innerHTML=q.ec[0]+' '+IC.out;}}}return;}
   if(t.dataset.rf&&cur&&cur.kind==='listing'){var r=S.listings.find(function(x){return x.id===cur.id;});if(r){r[t.dataset.rf]=t.value;save('listings',r);}return;}
   if(t.id==='draft'){t.dataset.touched='1';refreshOut();}
 });
