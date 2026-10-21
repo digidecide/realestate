@@ -545,7 +545,7 @@ function viewFind(){
        '<p class="cap">'+esc(r.caption)+'</p>'+
        (sel?'<div class="seller"><span class="av" style="--h:'+avh(r.username||'x')+'">'+esc(ini(r.username||'?'))+'</span><div><b>'+(r.username?esc(r.username):'Seller not shown')+(r.role&&r.role!=='Unknown'?' · '+esc(r.role):'')+'</b><small>'+(r.contact?esc(r.contact):'No phone shown')+'</small></div></div>':'<div class="seller"><small>Seller and phone not shown on the listing.</small></div>')+
        (r.images?'<div class="chips">'+imgLinks(r,2)+'</div>':'')+
-       '<div class="lact"><button class="btn sm pri" data-act="openListing" data-id="'+r.id+'">Review property</button></div></div></article>';}).join('')+'</div>'+(rows.length>150?'<div class="ph"><small>Showing the first 150 of '+rows.length+'. Narrow the filters to see the rest.</small></div>':'');
+       '<div class="lact"><button class="btn sm pri" data-act="openListing" data-id="'+r.id+'">Review property</button> <button class="btn sm" data-act="openVerify" data-id="'+r.id+'">Verify land '+vDone(r)+'/'+VSTEPS.length+'</button></div></div></article>';}).join('')+'</div>'+(rows.length>150?'<div class="ph"><small>Showing the first 150 of '+rows.length+'. Narrow the filters to see the rest.</small></div>':'');
   }else{
     h+='<div class="empty">'+emptyArt()+'<h3>'+(S.listings.length?'No posts match your filters':'Find the next property for your buyers')+'</h3><p>Import links and details from your searches. Price and location claims stay unverified until you review them.</p><button class="btn pri" data-act="'+(S.listings.length?'clearF':'modal')+'" data-v="listings">'+(S.listings.length?'Clear filters':'Import listings')+'</button></div>';
   }
@@ -566,11 +566,12 @@ var VSTATES={
  'Andhra Pradesh':{portal:['Meebhoomi (Adangal / 1-B)','https://meebhoomi.ap.gov.in/'],ec:['AP Registration &amp; Stamps (EC)','https://registration.ap.gov.in/']},
  'Telangana':{portal:['Bhu Bharati (Land details)','https://bhubharati.telangana.gov.in/'],ec:['Telangana Registration (EC)','https://registration.telangana.gov.in/']}
 };
+function vFind(id){var o=S.props.find(function(x){return x.id===id;});if(o)return {o:o,col:'props'};o=S.listings.find(function(x){return x.id===id;});return o?{o:o,col:'listings'}:null;}
 function vOf(p){if(!p.vf)p.vf={state:'Andhra Pradesh',steps:{}};if(!p.vf.steps)p.vf.steps={};return p.vf;}
 function vDone(p){var v=p.vf;if(!v||!v.steps)return 0;return VSTEPS.filter(function(x){return v.steps[x[0]];}).length;}
 function vMaps(v){var c=(v.coords||'').replace(/\s+/g,'');return /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(c)?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c):'https://www.google.com/maps';}
 function openVerify(id){
-  var p=S.props.find(function(x){return x.id===id;});if(!p)return;cur={kind:'verify',id:id};var v=vOf(p),st=VSTATES[v.state]||VSTATES['Andhra Pradesh'];
+  var f=vFind(id),p=f&&f.o;if(!p)return;cur={kind:'verify',id:id,col:f.col};var v=vOf(p),st=VSTATES[v.state]||VSTATES['Andhra Pradesh'];
   function inp(k,l,ph){return '<label>'+l+'<input data-vf="'+k+'" value="'+esc(v[k]||'')+'" placeholder="'+(ph||'')+'"></label>';}
   var steps=VSTEPS.map(function(x,i){
     var links='';
@@ -579,7 +580,7 @@ function openVerify(id){
     if(x[0]==='owner')links='<a class="btn sm" data-vlink="portal" href="'+st.portal[1]+'" target="_blank" rel="noreferrer">'+st.portal[0]+' '+IC.out+'</a>';
     if(x[0]==='ec')links='<a class="btn sm" data-vlink="ec" href="'+st.ec[1]+'" target="_blank" rel="noreferrer">'+st.ec[0]+' '+IC.out+'</a>';
     return '<div class="vstep"><label class="ck"><input type="checkbox" data-vs="'+x[0]+'" '+(v.steps[x[0]]?'checked':'')+'><h4>'+(i+1)+'. '+x[1]+'</h4></label><small>'+x[2]+'</small>'+(links?'<div class="acts">'+links+'</div>':'')+'</div>';}).join('');
-  layer.innerHTML='<div class="ov right"><section class="drw" role="dialog" aria-modal="true" aria-label="Verify land"><button class="x" data-act="close" aria-label="Close">'+IC.x+'</button><div class="eyebrow">Land verification</div><h2>'+esc(p.title)+'</h2><small>'+esc(p.city)+' · '+esc(p.type)+'</small>'+
+  layer.innerHTML='<div class="ov right"><section class="drw" role="dialog" aria-modal="true" aria-label="Verify land"><button class="x" data-act="close" aria-label="Close">'+IC.x+'</button><div class="eyebrow">Land verification</div><h2>'+esc(p.title||(p.caption||'').slice(0,70)||'Listing')+'</h2><small>'+esc(p.city||'City not set')+' · '+esc(p.type||'Type not set')+'</small>'+
    '<div class="vbar"><i id="vbar"></i></div><small id="vprog"></small>'+
    '<label>State of the land<select data-vf="state">'+Object.keys(VSTATES).map(function(k){return '<option'+(k===v.state?' selected':'')+'>'+k+'</option>';}).join('')+'</select></label>'+
    '<div class="vsteps">'+steps+'</div>'+
@@ -596,7 +597,7 @@ function openVerify(id){
   vProg(p);
 }
 function vGeo(){
-  var p=S.props.find(function(x){return cur&&x.id===cur.id;}),n=document.getElementById('geonote');if(!p||!n)return;var v=vOf(p);
+  var vf1=cur&&vFind(cur.id),p=vf1&&vf1.o,n=document.getElementById('geonote');if(!p||!n)return;var v=vOf(p);
   var m=(v.coords||'').match(/(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/);
   if(!m){n.textContent='Enter coordinates like 17.916482, 78.813686 first.';return;}
   n.textContent='Looking up the location…';
@@ -808,7 +809,7 @@ document.addEventListener('click',function(ev){
     var ap=document.getElementById('approve').checked;
     if(!ap||!r.title.trim()||CITIES.indexOf(r.city)<0||TYPES.indexOf(r.type)<0||!(Number(r.price)>0)||r.status!=='Confirmed available'){dn2.innerHTML='<div class="warn" role="status">Enter title, city, type and the full asking price. Set availability to Confirmed available and tick the confirmation before adding.</div>';dn2.scrollIntoView({block:'center'});return;}
     var pid=r.inventoryId||(crypto.randomUUID?crypto.randomUUID():hid(String(Date.now())+Math.random()));
-    var p={id:pid,title:r.title.trim(),city:r.city,type:r.type,price:String(r.price),source:r.url,area:r.area,contact:r.contact,advertiser:r.username,role:r.role,notes:r.notes,images:r.images||''};
+    var p={id:pid,title:r.title.trim(),city:r.city,type:r.type,price:String(r.price),source:r.url,area:r.area,contact:r.contact,advertiser:r.username,role:r.role,notes:r.notes,images:r.images||'',vf:r.vf};
     var ix=S.props.findIndex(function(x){return x.id===pid;});if(ix<0)S.props.push(p);
     r.inventoryId=pid;save('props',p);save('listings',r);
     S.notice='Property added to your inventory with its original source.';closeLayer();renderPage();
@@ -818,7 +819,7 @@ document.addEventListener('input',function(ev){
   var t=ev.target;
   if(t.dataset.f){var k=t.dataset.f;S.f[k]=t.type==='checkbox'?t.checked:t.value;renderPage();return;}
   if(t.dataset.lf&&cur&&cur.kind==='lead'){var l=S.leads.find(function(x){return x.id===cur.id;});if(l){l[t.dataset.lf]=t.value;save('leads',l);var d=document.getElementById('draft');if(d&&!d.dataset.touched&&['location','type','country'].indexOf(t.dataset.lf)>=0){var sel=document.getElementById('mprop');d.value=tpl(cur.ch,l,sel&&sel.value?S.props.find(function(x){return x.id===sel.value;}):null);}refreshOut();}return;}
-  if((t.dataset.vf||t.dataset.vs)&&cur&&cur.kind==='verify'){var vp=S.props.find(function(x){return x.id===cur.id;});if(vp){var vv=vOf(vp);if(t.dataset.vs){vv.steps[t.dataset.vs]=t.checked;}else{vv[t.dataset.vf]=t.value;}save('props',vp);vProg(vp);
+  if((t.dataset.vf||t.dataset.vs)&&cur&&cur.kind==='verify'){var vf0=vFind(cur.id),vp=vf0&&vf0.o;if(vp){var vv=vOf(vp);if(t.dataset.vs){vv.steps[t.dataset.vs]=t.checked;}else{vv[t.dataset.vf]=t.value;}save(vf0.col,vp);vProg(vp);
       if(t.dataset.vf==='coords'){var a=document.querySelector('[data-vlink="maps"]');if(a)a.href=vMaps(vv);}
       if(t.dataset.vf==='state'){var q=VSTATES[vv.state]||VSTATES['Andhra Pradesh'];var a1=document.querySelector('[data-vlink="portal"]'),a2=document.querySelector('[data-vlink="ec"]');if(a1){a1.href=q.portal[1];a1.innerHTML=q.portal[0]+' '+IC.out;}if(a2){a2.href=q.ec[1];a2.innerHTML=q.ec[0]+' '+IC.out;}}}return;}
   if(t.dataset.rf&&cur&&cur.kind==='listing'){var r=S.listings.find(function(x){return x.id===cur.id;});if(r){r[t.dataset.rf]=t.value;save('listings',r);}return;}
