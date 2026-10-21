@@ -585,6 +585,7 @@ function openVerify(id){
    '<div class="vsteps">'+steps+'</div>'+
    '<div class="sec"><h3>Details to record</h3>'+
    inp('coords','Coordinates from Google Maps','17.916482, 78.813686')+
+   '<button type="button" class="btn sm pri" data-act="geo">Find village, mandal &amp; district from coordinates</button><small id="geonote">Survey number and owner come from government portals that ask for a captcha, so use the steps above for those.</small>'+
    '<div class="two">'+inp('survey','Survey number','e.g. 91 or 91/e/2')+inp('village','Village')+'</div>'+
    '<div class="two">'+inp('mandal','Mandal')+inp('district','District')+'</div>'+
    '<div class="two">'+inp('owner','Pattadar / owner name')+inp('father','Father’s / husband’s name')+'</div>'+
@@ -593,6 +594,19 @@ function openVerify(id){
    '<label>Encumbrance / other notes<textarea rows="3" data-vf="notes" placeholder="EC result, disputes, loans, boundary remarks">'+esc(v.notes||'')+'</textarea></label>'+
    '<small>Check every value on the official portal yourself. Entries here are your own notes, not government records.</small></div></section></div>';
   vProg(p);
+}
+function vGeo(){
+  var p=S.props.find(function(x){return cur&&x.id===cur.id;}),n=document.getElementById('geonote');if(!p||!n)return;var v=vOf(p);
+  var m=(v.coords||'').match(/(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/);
+  if(!m){n.textContent='Enter coordinates like 17.916482, 78.813686 first.';return;}
+  n.textContent='Looking up the location…';
+  fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&accept-language=en&lat='+m[1]+'&lon='+m[2]).then(function(r){if(!r.ok)throw new Error('x');return r.json();}).then(function(j){
+    var a=j&&j.address;if(!a){n.textContent='No place found at these coordinates.';return;}
+    var vals={village:a.village||a.hamlet||a.suburb||a.neighbourhood||a.town||a.city_district||a.city||'',mandal:(a.county||'').replace(/\s*Mandal$/i,''),district:(a.state_district||'').replace(/\s*District$/i,'')};
+    Object.keys(vals).forEach(function(k){var el=document.querySelector('[data-vf="'+k+'"]');if(el&&vals[k]){el.value=vals[k];el.dispatchEvent(new Event('input',{bubbles:true}));}});
+    var sel=document.querySelector('select[data-vf="state"]');if(sel&&VSTATES[a.state]){sel.value=a.state;sel.dispatchEvent(new Event('input',{bubbles:true}));}
+    n.textContent='Found: '+(j.display_name||'')+'. Place names come from OpenStreetMap and can differ from revenue-record names, so confirm them on the land portal.';
+  }).catch(function(){n.textContent='Lookup is not available here. It works on the live site with internet access.';});
 }
 function vProg(p){var n=vDone(p),b=document.getElementById('vbar'),t=document.getElementById('vprog');if(b)b.style.width=Math.round(n/VSTEPS.length*100)+'%';if(t)t.textContent=n===VSTEPS.length?'All checks done. Land verified.':n+' of '+VSTEPS.length+' checks done.';var bd=document.getElementById('vb-'+p.id);if(bd){bd.textContent=n+'/'+VSTEPS.length+' checks';bd.classList.toggle('ok',n===VSTEPS.length);}}
 
@@ -775,6 +789,7 @@ document.addEventListener('click',function(ev){
   else if(act==='logc'){var ll=curLead();if(ll){ll.contacts=(ll.contacts||[]).concat([{ch:cur.ch,at:new Date().toISOString()}]);if(ll.status==='New')ll.status='Contacted';save('leads',ll);var st=document.querySelector('[data-lf="status"]');if(st)st.value=ll.status;refreshOut();}}
   else if(act==='openListing')openListing(id);
   else if(act==='openVerify')openVerify(id);
+  else if(act==='geo')vGeo();
   else if(act==='sample'){document.getElementById('m-raw').value=cur.kind==='comments'?SAMPLE_C:SAMPLE_L;}
   else if(act==='doImport')doImport();
   else if(act==='exportLeads')dlFile('property-enquiries.csv',toCSV(filteredLeads(),LEAD_FIELDS));
