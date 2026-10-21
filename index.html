@@ -569,7 +569,8 @@ var VSTATES={
 function vFind(id){var o=S.props.find(function(x){return x.id===id;});if(o)return {o:o,col:'props'};o=S.listings.find(function(x){return x.id===id;});return o?{o:o,col:'listings'}:null;}
 function vOf(p){if(!p.vf)p.vf={state:'Andhra Pradesh',steps:{}};if(!p.vf.steps)p.vf.steps={};return p.vf;}
 function vDone(p){var v=p.vf;if(!v||!v.steps)return 0;return VSTEPS.filter(function(x){return v.steps[x[0]];}).length;}
-function vMaps(v){var c=(v.coords||'').replace(/\s+/g,'');return /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(c)?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c):'https://www.google.com/maps';}
+function vParse(t){t=String(t||'');try{t=decodeURIComponent(t);}catch(e){}var m=t.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/)||t.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)||t.match(/[?&](?:q|ll|query|destination)=(-?\d+(?:\.\d+)?)[,+ ]\s*(-?\d+(?:\.\d+)?)/)||t.match(/(-?\d{1,3}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)/);if(!m)return null;var a=+m[1],b=+m[2];if(Math.abs(a)>90||Math.abs(b)>180)return null;return [m[1],m[2]];}
+function vMaps(v){var c=vParse(v.coords);return c?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c[0]+','+c[1]):'https://www.google.com/maps';}
 function openVerify(id){
   var f=vFind(id),p=f&&f.o;if(!p)return;cur={kind:'verify',id:id,col:f.col};var v=vOf(p),st=VSTATES[v.state]||VSTATES['Andhra Pradesh'];
   function inp(k,l,ph){return '<label>'+l+'<input data-vf="'+k+'" value="'+esc(v[k]||'')+'" placeholder="'+(ph||'')+'"></label>';}
@@ -585,7 +586,7 @@ function openVerify(id){
    '<label>State of the land<select data-vf="state">'+Object.keys(VSTATES).map(function(k){return '<option'+(k===v.state?' selected':'')+'>'+k+'</option>';}).join('')+'</select></label>'+
    '<div class="vsteps">'+steps+'</div>'+
    '<div class="sec"><h3>Details to record</h3>'+
-   inp('coords','Coordinates from Google Maps','17.916482, 78.813686')+
+   inp('coords','Coordinates or Google Maps link','17.916482, 78.813686 or a google.com/maps link')+
    '<button type="button" class="btn sm pri" data-act="geo">Find village, mandal &amp; district from coordinates</button><small id="geonote">Survey number and owner come from government portals that ask for a captcha, so use the steps above for those.</small>'+
    '<div class="two">'+inp('survey','Survey number','e.g. 91 or 91/e/2')+inp('village','Village')+'</div>'+
    '<div class="two">'+inp('mandal','Mandal')+inp('district','District')+'</div>'+
@@ -598,10 +599,11 @@ function openVerify(id){
 }
 function vGeo(){
   var vf1=cur&&vFind(cur.id),p=vf1&&vf1.o,n=document.getElementById('geonote');if(!p||!n)return;var v=vOf(p);
-  var m=(v.coords||'').match(/(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/);
-  if(!m){n.textContent='Enter coordinates like 17.916482, 78.813686 first.';return;}
+  var m=vParse(v.coords);
+  if(!m&&/(goo\.gl|maps\.app)/i.test(v.coords||'')){n.textContent='Short Google links cannot be read here. Open the link, copy the numbers from the address bar (like 16.50, 80.64) and paste those.';return;}
+  if(!m){n.textContent='Paste coordinates like 17.916482, 78.813686 or a full Google Maps link first.';return;}
   n.textContent='Looking up the location…';
-  fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&accept-language=en&lat='+m[1]+'&lon='+m[2]).then(function(r){if(!r.ok)throw new Error('x');return r.json();}).then(function(j){
+  fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&accept-language=en&lat='+m[0]+'&lon='+m[1]).then(function(r){if(!r.ok)throw new Error('x');return r.json();}).then(function(j){
     var a=j&&j.address;if(!a){n.textContent='No place found at these coordinates.';return;}
     var vals={village:a.village||a.hamlet||a.suburb||a.neighbourhood||a.town||a.city_district||a.city||'',mandal:(a.county||'').replace(/\s*Mandal$/i,''),district:(a.state_district||'').replace(/\s*District$/i,'')};
     Object.keys(vals).forEach(function(k){var el=document.querySelector('[data-vf="'+k+'"]');if(el&&vals[k]){el.value=vals[k];el.dispatchEvent(new Event('input',{bubbles:true}));}});
