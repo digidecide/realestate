@@ -556,7 +556,7 @@ function viewFind(){
 /* ---------- land verification ---------- */
 var VSTEPS=[
  ['pin','Pin the exact location','Open Google Maps, drop a pin on the land, click it and copy the coordinates (example 17.916482, 78.813686).'],
- ['survey','Find the survey number on Bhuvan 2D','Open Bhuvan 2D (ISRO), paste the coordinates in the search box and read the survey number the map shows.'],
+ ['survey','Find the survey number','Open one of the survey finders, search by the pin or the village, and read the survey number. Government and third-party sites may ask for a captcha or login, so this step stays manual. The first three lookups on 1acre are free.'],
  ['owner','Look up the owner on the state land portal','Pick district, mandal and village, search by survey number and note the pattadar name, khata, extent and land nature.'],
  ['match','Match the owner to the seller','The pattadar name should match the person selling, or their documented power of attorney.'],
  ['ec','Check the Encumbrance Certificate','Get the EC for this survey number from the registration department to see loans, disputes and earlier sales.'],
@@ -577,7 +577,7 @@ function openVerify(id){
   var steps=VSTEPS.map(function(x,i){
     var links='';
     if(x[0]==='pin')links='<a class="btn sm" data-vlink="maps" href="'+vMaps(v)+'" target="_blank" rel="noreferrer">Open Google Maps '+IC.out+'</a>';
-    if(x[0]==='survey')links='<a class="btn sm" href="https://bhuvan.nrsc.gov.in/" target="_blank" rel="noreferrer">Open Bhuvan 2D '+IC.out+'</a>';
+    if(x[0]==='survey')links='<a class="btn sm" href="https://bhunaksha.ap.gov.in/" target="_blank" rel="noreferrer">Bhu Naksha AP '+IC.out+'</a><a class="btn sm" href="https://1acre.in/find-any-survey-number" target="_blank" rel="noreferrer">1acre survey finder '+IC.out+'</a><a class="btn sm" href="https://web.landeed.com/andhra-pradesh/find-my-survey" target="_blank" rel="noreferrer">Landeed survey finder '+IC.out+'</a><a class="btn sm" href="https://bhuvan.nrsc.gov.in/" target="_blank" rel="noreferrer">Bhuvan 2D '+IC.out+'</a>';
     if(x[0]==='owner')links='<a class="btn sm" data-vlink="portal" href="'+st.portal[1]+'" target="_blank" rel="noreferrer">'+st.portal[0]+' '+IC.out+'</a>';
     if(x[0]==='ec')links='<a class="btn sm" data-vlink="ec" href="'+st.ec[1]+'" target="_blank" rel="noreferrer">'+st.ec[0]+' '+IC.out+'</a>';
     return '<div class="vstep"><label class="ck"><input type="checkbox" data-vs="'+x[0]+'" '+(v.steps[x[0]]?'checked':'')+'><h4>'+(i+1)+'. '+x[1]+'</h4></label><small>'+x[2]+'</small>'+(links?'<div class="acts">'+links+'</div>':'')+'</div>';}).join('');
