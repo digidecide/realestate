@@ -556,7 +556,9 @@ function viewFind(){
 /* ---------- land verification ---------- */
 var VSTEPS=[
  ['pin','Pin the exact location','Open Google Maps, drop a pin on the land, click it and copy the coordinates (example 17.916482, 78.813686).'],
+ ['docs','Ask the seller for documents','Get a copy of the sale deed, pattadar passbook or Adangal / 1-B extract, and an Encumbrance Certificate. They all state the survey number. Read them with the document reader below.'],
  ['survey','Find the survey number','Open one of the survey finders, search by the pin or the village, and read the survey number. Government and third-party sites may ask for a captcha or login, so this step stays manual. The first three lookups on 1acre are free.'],
+ ['byname','Or find the survey number by owner name','On the state land portal, open the village records and look for the owner’s name or the extent. The survey number is listed beside it.'],
  ['owner','Look up the owner on the state land portal','Pick district, mandal and village, search by survey number and note the pattadar name, khata, extent and land nature.'],
  ['match','Match the owner to the seller','The pattadar name should match the person selling, or their documented power of attorney.'],
  ['ec','Check the Encumbrance Certificate','Get the EC for this survey number from the registration department to see loans, disputes and earlier sales.'],
@@ -579,6 +581,7 @@ function openVerify(id){
     if(x[0]==='pin')links='<a class="btn sm" data-vlink="maps" href="'+vMaps(v)+'" target="_blank" rel="noreferrer">Open Google Maps '+IC.out+'</a>';
     if(x[0]==='survey')links='<a class="btn sm" href="https://bhunaksha.ap.gov.in/" target="_blank" rel="noreferrer">Bhu Naksha AP '+IC.out+'</a><a class="btn sm" href="https://1acre.in/find-any-survey-number" target="_blank" rel="noreferrer">1acre survey finder '+IC.out+'</a><a class="btn sm" href="https://web.landeed.com/andhra-pradesh/find-my-survey" target="_blank" rel="noreferrer">Landeed survey finder '+IC.out+'</a><a class="btn sm" href="https://bhuvan.nrsc.gov.in/" target="_blank" rel="noreferrer">Bhuvan 2D '+IC.out+'</a>';
     if(x[0]==='owner')links='<a class="btn sm" data-vlink="portal" href="'+st.portal[1]+'" target="_blank" rel="noreferrer">'+st.portal[0]+' '+IC.out+'</a>';
+    if(x[0]==='byname')links='<a class="btn sm" data-vlink="portalb" href="'+st.portal[1]+'" target="_blank" rel="noreferrer">'+st.portal[0]+' '+IC.out+'</a>';
     if(x[0]==='ec')links='<a class="btn sm" data-vlink="ec" href="'+st.ec[1]+'" target="_blank" rel="noreferrer">'+st.ec[0]+' '+IC.out+'</a>';
     return '<div class="vstep"><label class="ck"><input type="checkbox" data-vs="'+x[0]+'" '+(v.steps[x[0]]?'checked':'')+'><h4>'+(i+1)+'. '+x[1]+'</h4></label><small>'+x[2]+'</small>'+(links?'<div class="acts">'+links+'</div>':'')+'</div>';}).join('');
   layer.innerHTML='<div class="ov right"><section class="drw" role="dialog" aria-modal="true" aria-label="Verify land"><button class="x" data-act="close" aria-label="Close">'+IC.x+'</button><div class="eyebrow">Land verification</div><h2>'+esc(p.title||(p.caption||'').slice(0,70)||'Listing')+'</h2><small>'+esc(p.city||'City not set')+' · '+esc(p.type||'Type not set')+'</small>'+
@@ -588,11 +591,16 @@ function openVerify(id){
    '<div class="sec"><h3>Details to record</h3>'+
    inp('coords','Coordinates or Google Maps link','17.916482, 78.813686 or a google.com/maps link')+
    '<button type="button" class="btn sm pri" data-act="geo">Find village, mandal &amp; district from coordinates</button><small id="geonote">Survey number and owner come from government portals that ask for a captcha, so use the steps above for those.</small>'+
+   '<label>Or read the location from a photo taken at the plot<input type="file" id="photofile" accept="image/*"></label><button type="button" class="btn sm" data-act="readPhoto">Read location from photo</button>'+
    '<div class="two">'+inp('survey','Survey number','e.g. 91 or 91/e/2')+inp('village','Village')+'</div>'+
    '<div class="two">'+inp('mandal','Mandal')+inp('district','District')+'</div>'+
    '<div class="two">'+inp('owner','Pattadar / owner name')+inp('father','Father’s / husband’s name')+'</div>'+
    '<div class="two">'+inp('khata','Khata number')+inp('extent','Extent of land','e.g. 2.00 acres')+'</div>'+
    '<div class="two">'+inp('nature','Nature of land')+inp('classification','Classification')+'</div>'+
+   inp('seller','Seller’s name (who is selling)')+
+   '<h3>Read a seller document</h3><small>Choose a sale deed, Adangal / 1-B, passbook or EC (PDF, photo or text). It is read in your browser and not uploaded. Scanned pages are read with OCR and can contain mistakes.</small>'+
+   '<label>Document language<select id="doclang"><option value="eng">English</option><option value="eng+tel">English and Telugu (slower, larger download)</option></select></label>'+
+   '<input type="file" id="docfile" accept=".pdf,.txt,image/*"><button type="button" class="btn sm pri" data-act="readDoc">Read document</button><small id="docnote"></small><div id="dres" class="vsteps"></div>'+docHist(v)+
    '<label>Encumbrance / other notes<textarea rows="3" data-vf="notes" placeholder="EC result, disputes, loans, boundary remarks">'+esc(v.notes||'')+'</textarea></label>'+
    '<small>Check every value on the official portal yourself. Entries here are your own notes, not government records.</small></div></section></div>';
   vProg(p);
@@ -610,6 +618,130 @@ function vGeo(){
     var sel=document.querySelector('select[data-vf="state"]');if(sel&&VSTATES[a.state]){sel.value=a.state;sel.dispatchEvent(new Event('input',{bubbles:true}));}
     n.textContent='Found: '+(j.display_name||'')+'. Place names come from OpenStreetMap and can differ from revenue-record names, so confirm them on the land portal.';
   }).catch(function(){n.textContent='Lookup is not available here. It works on the live site with internet access.';});
+}
+/* ---------- document reader (runs in the browser; files are not uploaded) ---------- */
+var PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',PDFW='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',TESS='https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js',LIBOK={};
+function loadScript(u){return new Promise(function(res,rej){if(LIBOK[u])return res();var s=document.createElement('script');s.src=u;s.onload=function(){LIBOK[u]=1;res();};s.onerror=function(){rej(new Error('could not load the reader library, check your internet connection'));};document.head.appendChild(s);});}
+function docExtract(t){
+  var o={type:'Unknown document',survey:[],extent:[],names:[],father:[],khata:'',village:'',mandal:'',district:'',docno:'',dates:[],risks:[],noenc:false};
+  var flat=String(t).replace(/[ \t]+/g,' ');
+  function uniq(a){var s={},r=[];a.forEach(function(x){x=String(x).trim().replace(/[.,;:\-]+$/,'').trim();var k=x.toLowerCase();if(x&&!s[k]){s[k]=1;r.push(x);}});return r;}
+  var m,re=/(?:survey|sur\.?|sy\.?|s\.)\s*(?:nos?\.?|number|numbers)\s*[:\-–.]?\s*(\d{1,5}(?:\s*[\/\-]\s*[0-9A-Za-z]{1,4}){0,3}(?:\s*(?:,|&|and)\s*\d{1,5}(?:\s*\/\s*[0-9A-Za-z]{1,4})*)*)/gi;
+  while((m=re.exec(flat))){m[1].split(/\s*(?:,|&|\band\b)\s*/i).forEach(function(p){o.survey.push(p.replace(/\s+/g,''));});}
+  re=/సర్వే\s*(?:నెం|నంబర్|నంబరు|నం)\.?\s*[:\-]?\s*(\d{1,5}(?:\s*[\/\-]\s*[0-9A-Za-z]{1,4})*)/g;
+  while((m=re.exec(flat))){o.survey.push(m[1].replace(/\s+/g,''));}
+  o.survey=uniq(o.survey);
+  re=/(\d+(?:\.\d+)?)\s*(acres?|ac\b\.?|cents?|guntas?|sq\.?\s*(?:yards?|yds?|ft|feet|mtrs?|meters?)|square\s+(?:yards|feet|meters))/gi;
+  while((m=re.exec(flat))){o.extent.push(m[1]+' '+m[2].replace(/\s+/g,' '));}
+  o.extent=uniq(o.extent).slice(0,6);
+  re=/(?:name of the pattadar|pattadar(?:\s*name)?|owner(?:'s)?(?:\s*name)?|vendor|seller|executant|purchaser|vendee|claimant)\s*[:\-–]\s*(?:sri|smt|mr|mrs|ms|shri|late)?\.?\s*([A-Za-z][A-Za-z .]{2,40})/gi;
+  while((m=re.exec(flat))){o.names.push(m[1].replace(/\s+(?:s|d|w|c)\s*$/i,'').replace(/\s+(?:aged|age|resident|r|extent|survey|khata|village|mandal|district|document|sy)\b.*$/i,'').replace(/\s+(?:S|D|W|C)$/,''));}
+  o.names=uniq(o.names).slice(0,6);
+  re=/(?:s\/o|d\/o|w\/o|c\/o|son of|daughter of|wife of|father'?s? name|husband'?s? name)\.?\s*[:\-]?\s*(?:sri|smt|late)?\.?\s*([A-Za-z][A-Za-z .]{2,40})/gi;
+  while((m=re.exec(flat))){o.father.push(m[1].replace(/\s+(?:aged|age|resident|r|extent|survey|khata|village|mandal|district|document|sy)\b.*$/i,''));}
+  o.father=uniq(o.father).slice(0,4);
+  m=flat.match(/khata\s*(?:no\.?|number)?\s*[:\-]?\s*(\d{1,8})/i);if(m)o.khata=m[1];
+  m=flat.match(/village\s*[:\-–]\s*([A-Za-z][A-Za-z ]{1,30})/i);if(m)o.village=m[1].trim();
+  m=flat.match(/mandal\s*[:\-–]\s*([A-Za-z][A-Za-z ]{1,30})/i);if(m)o.mandal=m[1].trim();
+  m=flat.match(/district\s*[:\-–]\s*([A-Za-z][A-Za-z ]{1,30})/i);if(m)o.district=m[1].trim();
+  m=flat.match(/(?:document|doc\.?|registration|regd\.?)\s*(?:no\.?|number)\s*[:\-]?\s*(\d+\s*(?:\/|of)\s*\d{2,4})/i);if(m)o.docno=m[1].replace(/\s+/g,' ');
+  re=/\b(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})\b/g;while((m=re.exec(flat))){o.dates.push(m[1]);}
+  o.dates=uniq(o.dates).slice(0,5);
+  var rk=flat.match(/mortgage|hypothecat\w*|loan|lien|litigation|attachment|injunction|dispute\w*|court|charge/gi)||[];
+  o.risks=uniq(rk.map(function(x){return x.toLowerCase();}));
+  o.noenc=/\b(nil|no\s+encumbrances?)\b/i.test(flat);
+  var low=flat.toLowerCase();
+  if(/encumbrance certificate|form\s*-?\s*15|form\s*-?\s*16/.test(low))o.type='Encumbrance Certificate';
+  else if(/sale deed|deed of sale|conveyance/.test(low))o.type='Sale deed';
+  else if(/adangal|1-b|pahani|passbook|pattadar/.test(low))o.type='Land record (Adangal / 1-B / passbook)';
+  else if(/gift deed|settlement deed|will\b/.test(low))o.type='Gift / settlement deed or will';
+  return o;
+}
+function docOcr(src,n){var lang=(document.getElementById('doclang')||{}).value||'eng';return loadScript(TESS).then(function(){return Tesseract.recognize(src,lang,{logger:function(x){if(x&&x.status)n.textContent='Reading text from the image: '+x.status+' '+Math.round((x.progress||0)*100)+'%';}});}).then(function(r){return r.data.text;});}
+function docText(f,n){
+  var nm=f.name.toLowerCase();
+  if(/\.txt$/.test(nm)||f.type==='text/plain')return f.text();
+  if(/\.pdf$/.test(nm)||f.type==='application/pdf'){
+    return loadScript(PDFJS).then(function(){pdfjsLib.GlobalWorkerOptions.workerSrc=PDFW;return f.arrayBuffer();}).then(function(b){return pdfjsLib.getDocument({data:b}).promise;}).then(async function(pdf){
+      var out='',i,pg,c;
+      for(i=1;i<=Math.min(pdf.numPages,15);i++){pg=await pdf.getPage(i);c=await pg.getTextContent();out+=c.items.map(function(x){return x.str+(x.hasEOL?'\n':' ');}).join('')+'\n';}
+      if(out.replace(/\s/g,'').length>=40)return out;
+      out='';n.textContent='This PDF is a scan. Reading text from the pages…';
+      for(i=1;i<=Math.min(pdf.numPages,4);i++){pg=await pdf.getPage(i);var vp=pg.getViewport({scale:2}),cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;out+=await docOcr(cv,n)+'\n';}
+      return out;});
+  }
+  if(/^image\//.test(f.type)||/\.(jpe?g|png|webp|bmp)$/.test(nm))return docOcr(f,n);
+  return Promise.reject(new Error('use a PDF, a photo (JPG or PNG) or a text file'));
+}
+function docNorm(s){return String(s||'').replace(/\s+/g,'').toLowerCase();}
+function readDoc(){
+  var f=(document.getElementById('docfile')||{}).files&&document.getElementById('docfile').files[0],n=document.getElementById('docnote');if(!n)return;
+  if(!f){n.textContent='Choose a document first.';return;}
+  if(f.size>15000000){n.textContent='Use a file smaller than 15 MB.';return;}
+  n.textContent='Reading…';
+  docText(f,n).then(function(t){
+    if(!t||t.replace(/\s/g,'').length<20){n.textContent='No readable text found. Try a clearer photo or a text PDF.';return;}
+    var o=docExtract(t);showDoc(o,f.name,t);n.textContent='Done. Check every value against the original document.';
+    var vf=cur&&vFind(cur.id);if(vf){var v=vOf(vf.o);v.docs=(v.docs||[]).concat([{name:f.name,type:o.type,survey:o.survey.join(', '),at:new Date().toISOString().slice(0,10)}]).slice(-6);save(vf.col,vf.o);}
+  }).catch(function(e){n.textContent='Could not read this file: '+(e&&e.message||e);});
+}
+function showDoc(o,name,t){
+  var vf=cur&&vFind(cur.id),v=vf?vOf(vf.o):{};
+  function chips(k,a){return a.length?a.map(function(x){return '<button type="button" class="btn sm" data-act="useVal" data-k="'+k+'" data-v="'+esc(x)+'">'+esc(x)+'</button>';}).join(''):'<small>not found</small>';}
+  function row(l,k,a){return '<div class="vstep"><h4>'+l+'</h4><div class="acts">'+chips(k,a)+'</div></div>';}
+  var h='<div class="vstep"><h4>'+esc(o.type)+'</h4><small>'+esc(name)+'. Tap a value to copy it into the details above.</small></div>';
+  h+=row('Survey number','survey',o.survey);
+  var rec=docNorm(v.survey);
+  if(o.survey.length&&rec){var hit=o.survey.some(function(x){return docNorm(x)===rec||docNorm(x).indexOf(rec)===0||rec.indexOf(docNorm(x))===0;});h+='<div class="warn" role="status">'+(hit?'The survey number you recorded ('+esc(v.survey)+') appears in this document.':'The survey number you recorded ('+esc(v.survey)+') does not appear in this document. Check which one is right.')+'</div>';}
+  h+=row('Owner / seller name','owner',o.names)+row('Father’s / husband’s name','father',o.father)+row('Extent','extent',o.extent);
+  var misc=[['khata','Khata number',o.khata],['village','Village',o.village],['mandal','Mandal',o.mandal],['district','District',o.district]].filter(function(x){return x[2];});
+  if(misc.length)h+=misc.map(function(x){return row(x[1],x[0],[x[2]]);}).join('');
+  var sel=docNorm(v.seller);if(sel&&o.names.length){var toks=String(v.seller).toLowerCase().split(/\s+/).filter(function(x){return x.length>2;});var ok=o.names.some(function(nm){var l=nm.toLowerCase();return toks.some(function(x){return l.indexOf(x)>=0;});});h+='<div class="warn" role="status">'+(ok?'A name in this document shares words with the seller you entered.':'No name in this document matches the seller you entered ('+esc(v.seller)+'). Confirm the seller’s authority to sell.')+'</div>';}
+  if(o.docno||o.dates.length)h+='<div class="vstep"><h4>Reference</h4><small>'+(o.docno?'Document no. '+esc(o.docno)+'. ':'')+(o.dates.length?'Dates: '+esc(o.dates.join(', ')):'')+'</small></div>';
+  if(o.risks.length)h+='<div class="warn" role="status">Words to read closely in this document: '+esc(o.risks.join(', '))+'. Open the original and read those lines.</div>';
+  else if(o.noenc)h+='<div class="vstep"><small>The document says nil or no encumbrance. Confirm on the original.</small></div>';
+  h+='<details><summary>Show the text that was read</summary><pre style="white-space:pre-wrap;font-size:12px;max-height:220px;overflow:auto">'+esc(String(t).slice(0,6000))+'</pre></details>';
+  var d=document.getElementById('dres');if(d)d.innerHTML=h;
+}
+function docHist(v){var a=v.docs||[];return a.length?'<small>Read before: '+a.map(function(x){return esc(x.name)+' ('+esc(x.type)+(x.survey?', survey '+esc(x.survey):'')+')';}).join('; ')+'</small>':'';}
+/* ---------- read location from a photo (EXIF GPS, read in the browser) ---------- */
+function gpsFromTiff(d,t){
+  var le=d.getUint16(t)===0x4949;function u16(o){return d.getUint16(o,le);}function u32(o){return d.getUint32(o,le);}
+  if(u16(t+2)!==42)return null;
+  var ifd0=t+u32(t+4),n=u16(ifd0),gps=0,i,e;
+  for(i=0;i<n;i++){e=ifd0+2+i*12;if(u16(e)===0x8825){gps=t+u32(e+8);break;}}
+  if(!gps)return null;
+  var g=u16(gps),r={};
+  for(i=0;i<g;i++){e=gps+2+i*12;var tag=u16(e);
+    if(tag===1||tag===3){r[tag]=String.fromCharCode(d.getUint8(e+8));}
+    else if(tag===2||tag===4){var p=t+u32(e+8),v=[],k,den;for(k=0;k<3;k++){den=u32(p+k*8+4);v.push(den?u32(p+k*8)/den:0);}r[tag]=v;}}
+  if(!r[2]||!r[4])return null;
+  var la=r[2][0]+r[2][1]/60+r[2][2]/3600,lo=r[4][0]+r[4][1]/60+r[4][2]/3600;
+  if(r[1]==='S')la=-la;if(r[3]==='W')lo=-lo;
+  if(!isFinite(la)||!isFinite(lo)||(la===0&&lo===0))return null;
+  return [la.toFixed(6),lo.toFixed(6)];
+}
+function exifGPS(buf){
+  try{
+    var d=new DataView(buf),off=2,mk,sz;
+    if(d.getUint16(0)!==0xFFD8)return null;
+    while(off+4<d.byteLength){mk=d.getUint16(off);if(mk===0xFFDA||mk<0xFF00)break;sz=d.getUint16(off+2);
+      if(mk===0xFFE1&&d.getUint32(off+4)===0x45786966)return gpsFromTiff(d,off+10);
+      off+=2+sz;}
+  }catch(e){}
+  return null;
+}
+function readPhoto(){
+  var fi=document.getElementById('photofile'),n=document.getElementById('geonote'),f=fi&&fi.files&&fi.files[0];if(!n)return;
+  if(!f){n.textContent='Choose a photo first.';return;}
+  if(/heic|heif/i.test(f.type+f.name)){n.textContent='This photo is in HEIC format, which cannot be read here. On iPhone choose Settings > Camera > Formats > Most Compatible, or send the photo as a JPEG.';return;}
+  n.textContent='Reading the photo…';
+  f.arrayBuffer().then(function(b){
+    var c=exifGPS(b);
+    if(!c){n.textContent='No location found in this photo. Location tagging may be off in the camera, or WhatsApp removed it. Send the original photo as a document and try again.';return;}
+    var el=document.querySelector('[data-vf="coords"]');if(el){el.value=c[0]+', '+c[1];el.dispatchEvent(new Event('input',{bubbles:true}));}
+    n.textContent='Location found in the photo: '+c[0]+', '+c[1]+'. Looking up the place…';vGeo();
+  }).catch(function(){n.textContent='Could not read this photo.';});
 }
 function vProg(p){var n=vDone(p),b=document.getElementById('vbar'),t=document.getElementById('vprog');if(b)b.style.width=Math.round(n/VSTEPS.length*100)+'%';if(t)t.textContent=n===VSTEPS.length?'All checks done. Land verified.':n+' of '+VSTEPS.length+' checks done.';var bd=document.getElementById('vb-'+p.id);if(bd){bd.textContent=n+'/'+VSTEPS.length+' checks';bd.classList.toggle('ok',n===VSTEPS.length);}}
 
@@ -793,6 +925,9 @@ document.addEventListener('click',function(ev){
   else if(act==='openListing')openListing(id);
   else if(act==='openVerify')openVerify(id);
   else if(act==='geo')vGeo();
+  else if(act==='readDoc')readDoc();
+  else if(act==='readPhoto')readPhoto();
+  else if(act==='useVal'){var uf=document.querySelector('[data-vf="'+el.dataset.k+'"]');if(uf){uf.value=v;uf.dispatchEvent(new Event('input',{bubbles:true}));}}
   else if(act==='sample'){document.getElementById('m-raw').value=cur.kind==='comments'?SAMPLE_C:SAMPLE_L;}
   else if(act==='doImport')doImport();
   else if(act==='exportLeads')dlFile('property-enquiries.csv',toCSV(filteredLeads(),LEAD_FIELDS));
@@ -823,7 +958,7 @@ document.addEventListener('input',function(ev){
   if(t.dataset.lf&&cur&&cur.kind==='lead'){var l=S.leads.find(function(x){return x.id===cur.id;});if(l){l[t.dataset.lf]=t.value;save('leads',l);var d=document.getElementById('draft');if(d&&!d.dataset.touched&&['location','type','country'].indexOf(t.dataset.lf)>=0){var sel=document.getElementById('mprop');d.value=tpl(cur.ch,l,sel&&sel.value?S.props.find(function(x){return x.id===sel.value;}):null);}refreshOut();}return;}
   if((t.dataset.vf||t.dataset.vs)&&cur&&cur.kind==='verify'){var vf0=vFind(cur.id),vp=vf0&&vf0.o;if(vp){var vv=vOf(vp);if(t.dataset.vs){vv.steps[t.dataset.vs]=t.checked;}else{vv[t.dataset.vf]=t.value;}save(vf0.col,vp);vProg(vp);
       if(t.dataset.vf==='coords'){var a=document.querySelector('[data-vlink="maps"]');if(a)a.href=vMaps(vv);}
-      if(t.dataset.vf==='state'){var q=VSTATES[vv.state]||VSTATES['Andhra Pradesh'];var a1=document.querySelector('[data-vlink="portal"]'),a2=document.querySelector('[data-vlink="ec"]');if(a1){a1.href=q.portal[1];a1.innerHTML=q.portal[0]+' '+IC.out;}if(a2){a2.href=q.ec[1];a2.innerHTML=q.ec[0]+' '+IC.out;}}}return;}
+      if(t.dataset.vf==='state'){var q=VSTATES[vv.state]||VSTATES['Andhra Pradesh'];var a1=document.querySelector('[data-vlink="portal"]'),a2=document.querySelector('[data-vlink="ec"]');if(a1){a1.href=q.portal[1];a1.innerHTML=q.portal[0]+' '+IC.out;}if(a2){a2.href=q.ec[1];a2.innerHTML=q.ec[0]+' '+IC.out;}Array.prototype.forEach.call(document.querySelectorAll('[data-vlink="portalb"]'),function(a){a.href=q.portal[1];a.innerHTML=q.portal[0]+' '+IC.out;});}}return;}
   if(t.dataset.rf&&cur&&cur.kind==='listing'){var r=S.listings.find(function(x){return x.id===cur.id;});if(r){r[t.dataset.rf]=t.value;save('listings',r);}return;}
   if(t.id==='draft'){t.dataset.touched='1';refreshOut();}
 });
