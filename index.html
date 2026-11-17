@@ -258,7 +258,7 @@ function classify(t){
   return 'Review needed';
 }
 function igURL(s){try{var u=new URL(s);return u.protocol==='https:'&&/^(www\.)?instagram\.com$/.test(u.hostname)&&/^\/(p|reel)\/[A-Za-z0-9_-]+\/?$/.test(u.pathname)?'https://www.instagram.com'+u.pathname.replace(/\/?$/,'/'):'';}catch(e){return '';}}
-function webURL(s){try{var u=new URL(String(s).trim());return u.protocol==='https:'&&u.hostname.indexOf('.')>0?u.href:'';}catch(e){return '';}}
+function webURL(s){s=String(s||'').trim();if(/^http:\/\//i.test(s))s='https://'+s.slice(7);else if(s&&!/^[a-z]+:/i.test(s)&&/^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/|$)/i.test(s))s='https://'+s;try{var u=new URL(s);return u.protocol==='https:'&&u.hostname.indexOf('.')>0?u.href:'';}catch(e){return '';}}
 function platformOf(url){var h='';try{h=new URL(url).hostname.replace(/^www\./,'');}catch(e){return '';}
   if(/instagram\.com$/.test(h))return 'Instagram';if(/facebook\.com$|fb\.com$/.test(h))return 'Facebook';if(/youtube\.com$|youtu\.be$/.test(h))return 'YouTube';if(/linkedin\.com$/.test(h))return 'LinkedIn';
   if(/99acres|magicbricks|olx|housing\.com|nobroker|commonfloor|squareyards|quikr|sulekha|indiamart/.test(h))return 'Property portal';if(/google\./.test(h))return 'Google';return 'Web';}
@@ -281,10 +281,11 @@ function normalizeComments(rows,post,city,platform){
   });return out;
 }
 function parseCSV(s){
-  var rows=[],row=[],cell='',q=false;
+  var rows=[],row=[],cell='',q=false,first=s.split(/\r?\n/)[0]||'',sep=',';
+  if(first.indexOf(',')<0){if(first.indexOf('\t')>=0)sep='\t';else if(first.indexOf(';')>=0)sep=';';}
   for(var i=0;i<s.length;i++){var c=s[i];
     if(c==='"'){if(q&&s[i+1]==='"'){cell+='"';i++;}else q=!q;}
-    else if(c===','&&!q){row.push(cell);cell='';}
+    else if(c===sep&&!q){row.push(cell);cell='';}
     else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&s[i+1]==='\n')i++;row.push(cell);if(row.some(Boolean))rows.push(row);row=[];cell='';}
     else cell+=c;}
   if(q)throw new Error('Unclosed quoted field in the CSV.');
@@ -308,16 +309,19 @@ function hints(s){
   };
 }
 function num(v){var n=Number(String(v==null?'':v).replace(/[^\d.]/g,''));return n>0?String(Math.round(n)):'';}
+var KEYMAP={url:'url',posturl:'postUrl',postlink:'url',link:'url',permalink:'url',href:'url',reelurl:'url',videourl:'url',sourceurl:'url',pageurl:'url',post:'post',inputurl:'inputUrl',caption:'caption',captiontext:'caption',text:'text',snippet:'snippet',description:'description',title:'title',name:'title',heading:'title',ownerusername:'ownerUsername',username:'username',user:'username',author:'username',advertiser:'advertiser',seller:'seller',profile:'username',timestamp:'timestamp',date:'date',posteddate:'date',images:'images',image:'image',imageurl:'image',displayurl:'image',thumbnail:'image',photo:'image',photos:'images',city:'city',locality:'locality',area:'area',type:'type',propertytype:'type',price:'price',pricetext:'price_text',beds:'beds',bedrooms:'beds',phone:'phone',mobile:'phone',whatsapp:'phone',contact:'contact',role:'role',notes:'notes',source:'source',platform:'source'};
+function normKeys(r){if(!r||typeof r!=='object'||Array.isArray(r))return r;var o={};Object.keys(r).forEach(function(k){var nk=String(k).replace(/^\ufeff/,'').toLowerCase().replace(/[^a-z0-9]/g,'');var t=KEYMAP[nk]||k;if(o[t]==null||o[t]==='')o[t]=r[k];});return o;}
 function normalizeListings(rows,market,tags){
   var out=[];rows.forEach(function(r){
-    if(!r||typeof r!=='object')return;
-    var url=webURL(String(r.url||r.postUrl||r.post||r.link||''));
+    r=normKeys(r);if(!r||typeof r!=='object')return;
+    var url=webURL(String(r.url||r.postUrl||r.post||r.link||r.inputUrl||''));
+    if(!url&&r.shortCode)url='https://www.instagram.com/p/'+String(r.shortCode).replace(/[^A-Za-z0-9_-]/g,'')+'/';
     var title=String(r.title||'').trim().slice(0,160);
     var cap=String(r.caption||r.text||r.snippet||r.description||'').trim()||title;
     if(!url||!cap)return;
     var n=String(r.ownerUsername||r.username||r.advertiser||r.seller||'').replace(/^@/,'').trim().slice(0,80);
     var d=String(r.timestamp||r.date||'');
-    var imgs=String(r.images||r.image||'').split('|').map(function(u){return webURL(u);}).filter(Boolean).slice(0,10).join('|');
+    var imgs=(Array.isArray(r.images)?r.images.join('|'):String(r.images||r.image||r.displayUrl||'')).split('|').map(function(u){return webURL(u);}).filter(Boolean).slice(0,10).join('|');
     out.push({id:hid(url),url:url,source:String(r.source||platformOf(url)).slice(0,30),caption:cap.slice(0,15000),username:n,date:d&&!isNaN(Date.parse(d))?new Date(d).toISOString():'',searchCity:market||canon(r.city),tags:tags||'',
       title:title,city:canon(r.city),locality:String(r.locality||'').slice(0,120),type:TYPES.indexOf(r.type)>=0?r.type:'',price:num(r.price),priceText:String(r.price_text||r.priceText||'').slice(0,60),area:String(r.area||'').slice(0,60),beds:String(r.beds||'').slice(0,10),
       contact:String(r.phone||r.contact||'').slice(0,120),role:ROLES.indexOf(r.role)>=0?r.role:'Unknown',status:'Review needed',notes:String(r.notes||'').slice(0,1000),inventoryId:'',images:imgs});
@@ -1030,7 +1034,7 @@ async function doImport(){
       var rows;
       if(data&&!Array.isArray(data)&&data.kind==='estate-discovery'&&Array.isArray(data.rows))rows=data.rows.filter(function(r){return r&&r.id&&webURL(r.url);});
       else{if(!Array.isArray(data)||data.length>10000)throw new Error('Use a CSV or a JSON array with up to 10,000 posts.');rows=normalizeListings(data,city,'');}
-      if(!rows.length)throw new Error('No usable listings. Each row needs a caption and an Instagram post or reel URL (url or postUrl).');
+      if(!rows.length){var hk=Array.isArray(data)&&data[0]&&typeof data[0]==='object'?Object.keys(data[0]).slice(0,12).join(', '):'';throw new Error('No usable listings. Each row needs a link (url) and some text (caption or title).'+(hk?' Columns found: '+hk+'.':' No columns were found; check the first line has the headers.'));}
       var seen={};S.listings.forEach(function(l){seen[l.id]=1;});var n=0;
       rows.forEach(function(r){if(!seen[r.id]){seen[r.id]=1;S.listings.push(r);save('listings',r);n++;}});
       S.notice=n+' posts imported; '+(rows.length-n)+' duplicates skipped. All property details need review.';
