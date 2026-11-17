@@ -593,6 +593,7 @@ function vIgrs(){
 }
 function openVerify(id){
   var f=vFind(id),p=f&&f.o;if(!p)return;cur={kind:'verify',id:id,col:f.col};var v=vOf(p),st=VSTATES[v.state]||VSTATES['Andhra Pradesh'];
+  function sel(k,l,opts){return '<label>'+l+'<select data-vf="'+k+'">'+opts.map(function(o){return '<option value="'+o+'"'+(o===(v[k]||'')?' selected':'')+'>'+(o||'Select')+'</option>';}).join('')+'</select></label>';}
   function inp(k,l,ph){return '<label>'+l+'<input data-vf="'+k+'" value="'+esc(v[k]||'')+'" placeholder="'+(ph||'')+'"></label>';}
   var steps=VSTEPS.map(function(x,i){
     var links='';
@@ -621,6 +622,11 @@ function openVerify(id){
    '<h3>Read a seller document</h3><small>Choose a sale deed, Adangal / 1-B, passbook or EC (PDF, photo or text). It is read in your browser and not uploaded. Scanned pages are read with OCR and can contain mistakes.</small>'+
    '<label>Document language<select id="doclang"><option value="eng">English</option><option value="eng+tel">English and Telugu (slower, larger download)</option></select></label>'+
    '<input type="file" id="docfile" accept=".pdf,.txt,image/*"><button type="button" class="btn sm pri" data-act="readDoc">Read document</button><small id="docnote"></small><div id="dres" class="vsteps"></div>'+docHist(v)+
+   '<h3>Owner trace</h3><small>Meebhoomi gives the pattadar name but no phone number. Record here how you reached the real owner. Use public sources and what people tell you themselves, and stop contacting anyone who says no.</small>'+
+   '<div class="two">'+inp('tphone','Traced phone / WhatsApp')+inp('tplace','Where the owner lives now','e.g. Hyderabad, or abroad')+'</div>'+
+   '<div class="two">'+sel('tsource','Where the contact came from',['','Seller gave it','Village / neighbour enquiry','Panchayat or revenue office','Registered document','Facebook / Instagram','LinkedIn','Truecaller','Other'])+inp('tdate','Date traced','e.g. 17 Nov 2026')+'</div>'+
+   '<div class="two">'+sel('trole','Who is selling',['','Recorded owner','Family member / heir','Power of attorney holder','Broker / middleman','Not clear yet'])+sel('tstatus','Contact status',['','Not contacted','Spoke to owner','Owner confirmed the sale','Owner says not for sale','Wrong number','Asked not to be contacted'])+'</div>'+
+   '<label>Trace notes<textarea rows="2" data-vf="tnotes" placeholder="Heirs who must sign, relatives spoken to, what the owner said">'+esc(v.tnotes||'')+'</textarea></label>'+
    '<label>Encumbrance / other notes<textarea rows="3" data-vf="notes" placeholder="EC result, disputes, loans, boundary remarks">'+esc(v.notes||'')+'</textarea></label>'+
    '<small>Check every value on the official portal yourself. Entries here are your own notes, not government records.</small></div></section></div>';
   vProg(p);
