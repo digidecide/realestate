@@ -557,12 +557,14 @@ var VSTEPS=[
  ['owner','Look up the owner on the state land portal','Pick district, mandal and village, search by survey number and note the pattadar name, khata, extent and land nature.'],
  ['match','Match the owner to the seller','The pattadar name should match the person selling, or their documented power of attorney.'],
  ['ec','Check the Encumbrance Certificate','Get the EC for this survey number from the registration department to see loans, disputes and earlier sales.'],
+ ['prohibited','Check the prohibited property list','Search the survey number in the registration department’s prohibited list (Section 22A in Andhra Pradesh). Government, assigned, ceiling-surplus, endowment, wakf and court-attached land cannot be registered. Do this before any advance is paid.'],
+ ['mktval','Note the government market value','Look up the registration department’s rate for this survey number or locality. Stamp duty is worked out from it, and a price far above or below it is worth a question.'],
  ['site','Visit the site and confirm boundaries','Walk the land with the seller and check boundaries and access against the survey sketch.']
 ];
 var VSTATES={
- 'Andhra Pradesh':{portal:['Meebhoomi (Adangal / 1-B)','https://meebhoomi.ap.gov.in/'],ec:['AP Registration &amp; Stamps (EC)','https://registration.ap.gov.in/']},
- 'Other state':{portal:['Land records portal (search for your state)','https://www.google.com/search?q=state+land+records+portal+survey+number+owner+details'],ec:['Encumbrance certificate (search for your state)','https://www.google.com/search?q=encumbrance+certificate+online+registration+department']},
- 'Telangana':{portal:['Bhu Bharati (Land details)','https://bhubharati.telangana.gov.in/'],ec:['Telangana Registration (EC)','https://registration.telangana.gov.in/']}
+ 'Andhra Pradesh':{portal:['Meebhoomi (Adangal / 1-B)','https://meebhoomi.ap.gov.in/'],ec:['IGRS AP EC search','https://registration.ap.gov.in/igrs/EClandingPage'],pp:['IGRS AP prohibited property (22A)','https://registration.ap.gov.in/'],mv:['IGRS AP market value','https://registration.ap.gov.in/']},
+ 'Other state':{portal:['Land records portal (search for your state)','https://www.google.com/search?q=state+land+records+portal+survey+number+owner+details'],ec:['Encumbrance certificate (search for your state)','https://www.google.com/search?q=encumbrance+certificate+online+registration+department'],pp:['Prohibited property list (search for your state)','https://www.google.com/search?q=prohibited+property+list+registration+department+survey+number'],mv:['Market value (search for your state)','https://www.google.com/search?q=land+market+value+registration+department+survey+number']},
+ 'Telangana':{portal:['Bhu Bharati (Land details)','https://bhubharati.telangana.gov.in/'],ec:['Telangana Registration (EC)','https://registration.telangana.gov.in/'],pp:['Telangana Registration (prohibited property)','https://registration.telangana.gov.in/'],mv:['Telangana Registration (market value)','https://registration.telangana.gov.in/']}
 };
 function vFind(id){var o=S.props.find(function(x){return x.id===id;});if(o)return {o:o,col:'props'};o=S.listings.find(function(x){return x.id===id;});return o?{o:o,col:'listings'}:null;}
 function vOf(p){if(!p.vf)p.vf={state:'Andhra Pradesh',steps:{}};if(!p.vf.steps)p.vf.steps={};return p.vf;}
@@ -579,6 +581,16 @@ function vGuide(st){
    '<li><strong>Plots in a layout or city?</strong> Look for the layout approval or LP number, plot number and door number on the sale deed, then run the Encumbrance search at '+L(st.ec[1],st.ec[0])+'.</li>'+
    '<li><strong>Confirm it.</strong> Type the survey number below, then open the owner lookup (step 5) and check that the pattadar and extent match what the seller told you.</li></ol></details>';
 }
+function vIgrs(){
+  return '<details class="vguide"><summary><strong>Which portal answers what (Andhra Pradesh)</strong></summary><ul style="margin:8px 0 0;padding-left:20px;display:grid;gap:8px;font-size:13px">'+
+   '<li><strong>IGRS AP (registration.ap.gov.in)</strong> is the registration side: documents registered at a Sub-Registrar Office.</li>'+
+   '<li><strong>Encumbrance Certificate:</strong> registered sales, mortgages and other charges on the property for the period you choose. Ask for a long period, not only recent years.</li>'+
+   '<li><strong>Prohibited property (Section 22A):</strong> whether the survey number is barred from registration. The search is free.</li>'+
+   '<li><strong>Market value:</strong> the government rate for the survey number or locality, used for stamp duty.</li>'+
+   '<li><strong>Document search:</strong> registered deeds by name, survey number or document number. Use it to confirm the seller’s sale deed is real.</li>'+
+   '<li><strong>Meebhoomi</strong> is the revenue side: Adangal, 1-B, mutation status, e-Passbook and the FMB sketch. Owner name, khata and extent come from here, not from IGRS.</li>'+
+   '<li><strong>Use the official sites.</strong> Lookalike and third-party sites exist. Confirm anything you rely on at registration.ap.gov.in and meebhoomi.ap.gov.in.</li></ul></details>';
+}
 function openVerify(id){
   var f=vFind(id),p=f&&f.o;if(!p)return;cur={kind:'verify',id:id,col:f.col};var v=vOf(p),st=VSTATES[v.state]||VSTATES['Andhra Pradesh'];
   function inp(k,l,ph){return '<label>'+l+'<input data-vf="'+k+'" value="'+esc(v[k]||'')+'" placeholder="'+(ph||'')+'"></label>';}
@@ -589,7 +601,9 @@ function openVerify(id){
     if(x[0]==='owner')links='<a class="btn sm" data-vlink="portal" href="'+st.portal[1]+'" target="_blank" rel="noreferrer">'+st.portal[0]+' '+IC.out+'</a>';
     if(x[0]==='byname')links='<a class="btn sm" data-vlink="portalb" href="'+st.portal[1]+'" target="_blank" rel="noreferrer">'+st.portal[0]+' '+IC.out+'</a>';
     if(x[0]==='ec')links='<a class="btn sm" data-vlink="ec" href="'+st.ec[1]+'" target="_blank" rel="noreferrer">'+st.ec[0]+' '+IC.out+'</a>';
-    return '<div class="vstep"><label class="ck"><input type="checkbox" data-vs="'+x[0]+'" '+(v.steps[x[0]]?'checked':'')+'><h4>'+(i+1)+'. '+x[1]+'</h4></label><small>'+x[2]+'</small>'+(links?'<div class="acts">'+links+'</div>':'')+(x[0]==='survey'?vGuide(st):'')+'</div>';}).join('');
+    if(x[0]==='prohibited')links='<a class="btn sm" data-vlink="pp" href="'+st.pp[1]+'" target="_blank" rel="noreferrer">'+st.pp[0]+' '+IC.out+'</a>';
+    if(x[0]==='mktval')links='<a class="btn sm" data-vlink="mv" href="'+st.mv[1]+'" target="_blank" rel="noreferrer">'+st.mv[0]+' '+IC.out+'</a>';
+    return '<div class="vstep"><label class="ck"><input type="checkbox" data-vs="'+x[0]+'" '+(v.steps[x[0]]?'checked':'')+'><h4>'+(i+1)+'. '+x[1]+'</h4></label><small>'+x[2]+'</small>'+(links?'<div class="acts">'+links+'</div>':'')+(x[0]==='survey'?vGuide(st):'')+(x[0]==='ec'?vIgrs():'')+'</div>';}).join('');
   layer.innerHTML='<div class="ov right"><section class="drw" role="dialog" aria-modal="true" aria-label="Verify land"><button class="x" data-act="close" aria-label="Close">'+IC.x+'</button><div class="eyebrow">Land verification</div><h2>'+esc(p.title||(p.caption||'').slice(0,70)||'Listing')+'</h2><small>'+esc(p.city||'City not set')+' · '+esc(p.type||'Type not set')+'</small>'+
    '<div class="vbar"><i id="vbar"></i></div><small id="vprog"></small>'+
    '<label>State of the land<select data-vf="state">'+Object.keys(VSTATES).map(function(k){return '<option'+(k===v.state?' selected':'')+'>'+k+'</option>';}).join('')+'</select></label>'+
@@ -1088,7 +1102,7 @@ document.addEventListener('input',function(ev){
   if(t.dataset.lf&&cur&&cur.kind==='lead'){var l=S.leads.find(function(x){return x.id===cur.id;});if(l){l[t.dataset.lf]=t.dataset.lf==='location'?canon(t.value):t.value;save('leads',l);var d=document.getElementById('draft');if(d&&!d.dataset.touched&&['location','type','country'].indexOf(t.dataset.lf)>=0){var sel=document.getElementById('mprop');d.value=tpl(cur.ch,l,sel&&sel.value?S.props.find(function(x){return x.id===sel.value;}):null);}refreshOut();}return;}
   if((t.dataset.vf||t.dataset.vs)&&cur&&cur.kind==='verify'){var vf0=vFind(cur.id),vp=vf0&&vf0.o;if(vp){var vv=vOf(vp);if(t.dataset.vs){vv.steps[t.dataset.vs]=t.checked;}else{vv[t.dataset.vf]=t.value;}save(vf0.col,vp);vProg(vp);
       if(t.dataset.vf==='coords'){var a=document.querySelector('[data-vlink="maps"]');if(a)a.href=vMaps(vv);}
-      if(t.dataset.vf==='state'){var q=VSTATES[vv.state]||VSTATES['Andhra Pradesh'];var a1=document.querySelector('[data-vlink="portal"]'),a2=document.querySelector('[data-vlink="ec"]');if(a1){a1.href=q.portal[1];a1.innerHTML=q.portal[0]+' '+IC.out;}if(a2){a2.href=q.ec[1];a2.innerHTML=q.ec[0]+' '+IC.out;}Array.prototype.forEach.call(document.querySelectorAll('[data-vlink="portalb"]'),function(a){a.href=q.portal[1];a.innerHTML=q.portal[0]+' '+IC.out;});}}return;}
+      if(t.dataset.vf==='state'){var q=VSTATES[vv.state]||VSTATES['Andhra Pradesh'];var a1=document.querySelector('[data-vlink="portal"]'),a2=document.querySelector('[data-vlink="ec"]');if(a1){a1.href=q.portal[1];a1.innerHTML=q.portal[0]+' '+IC.out;}if(a2){a2.href=q.ec[1];a2.innerHTML=q.ec[0]+' '+IC.out;}['pp','mv'].forEach(function(k){var a3=document.querySelector('[data-vlink="'+k+'"]');if(a3){a3.href=q[k][1];a3.innerHTML=q[k][0]+' '+IC.out;}});Array.prototype.forEach.call(document.querySelectorAll('[data-vlink="portalb"]'),function(a){a.href=q.portal[1];a.innerHTML=q.portal[0]+' '+IC.out;});}}return;}
   if(t.dataset.rf&&cur&&cur.kind==='listing'){var r=S.listings.find(function(x){return x.id===cur.id;});if(r){r[t.dataset.rf]=t.dataset.rf==='city'?canon(t.value):t.value;save('listings',r);}return;}
   if(t.id==='draft'){t.dataset.touched='1';refreshOut();}
 });
